@@ -1,64 +1,45 @@
 blueprint:
-  name: ZHA - Tuya - TS004F Smart Knob
-  description: 'This automation adds triggers for all actions of the Tuya TS004F rotating
-    knob remote. It can be used in both Command/Dimmer and Event/Scene mode. Both
-    modes have their own actions.
-
-    In Command/Dimmer mode the config is mostly internal except for pressing the button.
-    In Event/Scene mode you can select your own actions. To switch modes you can press
-    the button 3 times fast.
-
-    Sold on AliExpress by brands like Moes, Girier etc.
+  name: ZHA - Moes Smart Knob for lights
+  description: 'Control lights with a Moes Smart Knob.
+  
+    The knob functions in 2 modes: Command and Event/Scene. To switch between them, triple click the center button
     
-    Original blueprints by JoryHovgeveen,  seamus65 and GonzaloAlbito. Merged by Dreamscent'
+    Command mode:
+    1. Single Press
+    2. Rotate Left/Right to dim
+    3. Rotate Left/Right while pressing the center button to dim a different light(if prefered)
+
+    Event/Scene mode:
+    1. Single Press
+    2. Double Press
+    3. Long Press (Hold for about 4 seconds then release)
+
+    Original blueprint by seamus65 (https://gist.github.com/seamus65/939a147634942dd885c8704334627f93).
+
+    Improved by GonzaloAlbito (https://gist.github.com/gonzaloalbito/3dc06702e941e08298ea9bfade731731).
+
+    Merged by Dreamscent(0x4a)
+
+    Version 2022-05-29.'
   domain: automation
-  # The input stuff comes here.
   input:
-    mode:
-      name: Automation Mode
-      description: https://www.home-assistant.io/docs/automation/modes/
-      default: restart
-      selector:
-        select:
-          mode: dropdown
-          options:
-          - single
-          - restart
-          - queued
-          - parallel
-          multiple: false
-          custom_value: false
-    max:
-      name: Automation Max Queue
-      description: The maximum number of runs that can be executing and/or queued
-        up at a time.
-      default: 10
-      selector:
-        number:
-          mode: box
-          min: 1.0
-          max: 100.0
-          step: 1.0
     remote:
-      name: Tuya - TS004F Rotating Knob
-      description: Select the remote control you wish to use.
+      name: Remote
+      description: Moes Knob to use
       selector:
         device:
           integration: zha
+          manufacturer: _TZ3000_qja6nq5z
           model: TS004F
           multiple: false
     light:
-      name: Light (Command/Dimmer mode)
+      name: Light(s)
+      description: The light(s) to control
       selector:
         target:
           entity:
           - domain:
             - light
-    single_press:
-      name: Toggle (Command/Dimmer mode)
-      selector:
-        action: {}
-      default: []
     step_percent:
       name: Light step
       description: Light pecent change for each knob step
@@ -80,7 +61,7 @@ blueprint:
             - light
     press_step_percent:
       name: Pressed light step
-      description: Light pecent change for each knob step while pressed
+      description: Light pecent change for each knob step when pressed
       selector:
         number:
           mode: slider
@@ -89,6 +70,13 @@ blueprint:
           unit_of_measurement: '%'
           step: 1.0
       default: 10
+    single_press:
+      name: Single press
+      description: Action to run on single press
+      default: []
+      selector:
+        action: {}
+    # event mode starts here
     press_short:
       name: Short Press (Event/Scene mode)
       selector:
@@ -114,11 +102,8 @@ blueprint:
       selector:
         action: {}
       default: []
-  source_url: https://github.com/dreamscent
-
-# How it handles the TuYa data comes here
-mode: !input mode
-max: !input max
+  source_url: https://gist.github.com/gonzaloalbito/3dc06702e941e08298ea9bfade731731
+mode: restart
 max_exceeded: silent
 trigger:
 - platform: event
@@ -126,56 +111,37 @@ trigger:
   event_data:
     device_id: !input remote
 action:
-# first create variables from the triggering action and automation user inputs for use later
 - variables:
-    light: !input light
+    # same for both
     command: '{{ trigger.event.data.command }}'
     cluster_id: '{{ trigger.event.data.cluster_id }}'
     endpoint_id: '{{ trigger.event.data.endpoint_id }}'
+    mode: '{% if command != ''toggle'' %} {{ trigger.event.data.args[0] }} {% endif
+      %}'
+    # edit: added a second if to avoid error because event mode doesn't have args[1]
+    steps: '{% if command != ''toggle'' %} { { %if trigger.event.data.args[1] %} { { (trigger.event.data.args[1] / 12.5 )
+      | int }}}{% endif %}'
+    step_percent: !input step_percent
+    press_step_percent: !input press_step_percent
+    # jory stuff
     args: '{{ trigger.event.data.args }}'
-    # sets direction to 0,1,2 based on what args[0] is
     direction: '{% if trigger.event.data.args[0] == 0 %} 0 {% elif trigger.event.data.args[0]
       == 1 %} 1 {% elif trigger.event.data.args[0] == 3 %} 3 {% endif %}'
     value: '{% if trigger.event.data.args[1] %} {{ trigger.event.data.args[1] / 2
       }} {% endif %}'
     speed: '{% if trigger.event.data.args[2] == 1 %} 0.5 {% else %} 0 {% endif %}'
-    # added on
-    mode: '{% if command != ''toggle'' %} {{ trigger.event.data.args[0] }} {% endif
-      %}'
-    steps: '{% if command != ''toggle'' %} {{ (trigger.event.data.args[1] / 12.5 )
-      | int }} {% endif %}'
-    step_percent: !input step_percent
-    press_step_percent: !input press_step_percent
+
 - choose:
-  # do stuff based on the variables above
   - conditions:
-    - '{{ command == ''toggle'' }}'
     - '{{ cluster_id == 6 }}'
     - '{{ endpoint_id == 1 }}'
+    - '{{ command == ''toggle'' }}'
     sequence: !input single_press
-  # COMMAND MODE
-  # For rotations. Direction 0 and 1 are left and right(or vice versa, but should not matter sincce most people set them both the same)
   - conditions:
-    - '{{ command == ''step'' }}'
     - '{{ cluster_id == 8 }}'
     - '{{ endpoint_id == 1 }}'
-    - '{{ direction == 0 }}'
-    sequence:
-    - repeat:
-        while:
-        - condition: template
-          value_template: '{{ repeat.index < 2 }}'
-        sequence:
-        - service_template: light.turn_on
-          target: !input light
-          data_template:
-            brightness_step_pct: '{{ value }}'
-            transition: '{{ speed }}'
-  - conditions:
     - '{{ command == ''step'' }}'
-    - '{{ cluster_id == 8 }}'
-    - '{{ endpoint_id == 1 }}'
-    - '{{ direction == 1 }}'
+    - '{{ mode == ''StepMode.Up'' }}'
     sequence:
     - repeat:
         while:
@@ -185,71 +151,58 @@ action:
         - service_template: light.turn_on
           target: !input light
           data_template:
-            brightness_step_pct: '{{ - value }}'
-            transition: '{{ speed }}'
-  # step_color_temp = press and rotate [to confirm]
-  - conditions:
-    - '{{ command == ''step_color_temp'' }}'
-    - '{{ cluster_id == 768 }}'
-    - '{{ endpoint_id == 1 }}'
-    - '{{ direction == 1 }}'
-    sequence:
-    - repeat:
-        while:
-        - condition: template
-          value_template: '{{ repeat.index < 2 }}'
-        sequence:
-        - service_template: light.turn_on
-          target: !input press_light
-          data_template:
-            color_temp: '{{ ( state_attr( light.entity_id, ''color_temp'' ) or 300
-              ) + value }}'
-            transition: '{{ speed }}'
-  - conditions:
-    - '{{ command == ''step_color_temp'' }}'
-    - '{{ cluster_id == 768 }}'
-    - '{{ endpoint_id == 1 }}'
-    - '{{ direction == 3 }}'
-    sequence:
-    - repeat:
-        while:
-        - condition: template
-          value_template: '{{ repeat.index < 2 }}'
-        sequence:
-        - service_template: light.turn_on
-          target: !input press_light
-          data_template:
-            color_temp: '{{ ( state_attr( light.entity_id, ''color_temp'' ) or 300
-              ) - value }}'
-            transition: '{{ speed }}'
-  - conditions:
-    - '{{ command == ''move_hue'' }}'
-    - '{{ cluster_id == 768 }}'
-    - '{{ endpoint_id == 1 }}'
-    sequence:
-    - repeat:
-        while:
-        - condition: template
-          value_template: '{{ repeat.index < 24 }}'
-        sequence:
-        - service_template: light.turn_on
-          target: !input light
-          data_template:
-            hs_color:
-            - '{{ ( value + (state_attr( light.entity_id , ''hs_color'' )[0] or 0))
-              % 360 }}'
-            - 100
+            brightness_step_pct: '{{ step_percent * steps }}'
             transition: 0.5
-        - delay:
-            hours: 0
-            minutes: 0
-            seconds: 1
-            milliseconds: 0
   - conditions:
-    - '{{ command == ''stop_move_step'' }}'
+    - '{{ cluster_id == 8 }}'
+    - '{{ endpoint_id == 1 }}'
+    - '{{ command == ''step'' }}'
+    - '{{ mode == ''StepMode.Down'' }}'
+    sequence:
+    - repeat:
+        while:
+        - condition: template
+          value_template: '{{ repeat.index < 2 }}'
+        sequence:
+        - service_template: light.turn_on
+          target: !input light
+          data_template:
+            brightness_step_pct: -{{ step_percent * steps }}
+            transition: 0.5
+  - conditions:
     - '{{ cluster_id == 768 }}'
     - '{{ endpoint_id == 1 }}'
+    - '{{ command == ''step_color_temp'' }}'
+    - '{{ mode == ''StepMode.Up'' }}'
     sequence:
+    - repeat:
+        while:
+        - condition: template
+          value_template: '{{ repeat.index < 2 }}'
+        sequence:
+        - service_template: light.turn_on
+          target: !input press_light
+          data_template:
+            brightness_step_pct: '{{ press_step_percent * steps }}'
+            transition: 0.5
+  - conditions:
+    - '{{ cluster_id == 768 }}'
+    - '{{ endpoint_id == 1 }}'
+    - '{{ command == ''step_color_temp'' }}'
+    - '{{ mode == ''StepMode.Down'' }}'
+    sequence:
+    - repeat:
+        while:
+        - condition: template
+          value_template: '{{ repeat.index < 2 }}'
+        sequence:
+        - service_template: light.turn_on
+          target: !input press_light
+          data_template:
+            brightness_step_pct: -{{ press_step_percent * steps }}
+            transition: 0.5
+
+# event mode
   - conditions:
     - '{{ command == ''remote_button_short_press'' }}'
     sequence: !input press_short
@@ -259,6 +212,7 @@ action:
   - conditions:
     - '{{ command == ''remote_button_long_press'' }}'
     sequence: !input press_long
+    # not working, WIP
   - conditions:
     - '{{ command == ''left'' }}'
     sequence: !input rotate_left
