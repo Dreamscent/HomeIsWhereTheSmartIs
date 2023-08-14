@@ -1,0 +1,52 @@
+blueprint:
+  name: Two-Way Switching
+  description: Control two entities bidirectionally with infinite loop prevention
+  domain: automation
+  input:
+    entity_1:
+      name: Entity 1
+      description: The first entity
+      selector:
+        entity:
+          domain:
+            - switch
+            - light
+            - button
+    entity_2:
+      name: Entity 2
+      description: The second entity
+      selector:
+        entity:
+          domain:
+            - switch
+            - light
+            - button
+
+trigger:
+  platform: state
+  entity_id:
+    - !input entity_1
+    - !input entity_2
+
+action:
+  - variables:
+      e1: !input entity_1
+      e2: !input entity_2
+
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == e1 }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.state != state_attr(e2, 'state') }}"
+        sequence:
+          - service_template: "homeassistant.{{ 'turn_on' if trigger.to_state.state == 'on' else 'turn_off' }}"
+            entity_id: !input entity_2
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == e2 }}"
+          - condition: template
+            value_template: "{{ trigger.to_state.state != state_attr(e1, 'state') }}"
+        sequence:
+          - service_template: "homeassistant.{{ 'turn_on' if trigger.to_state.state == 'on' else 'turn_off' }}"
+            entity_id: !input entity_1
