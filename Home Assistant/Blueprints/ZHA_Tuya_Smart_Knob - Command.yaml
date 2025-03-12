@@ -1,6 +1,7 @@
 blueprint:
-  name: ZHA - Moes Smart Knob for lights
-  description: 'Control lights with a Moes Smart Knob. [...]'
+  name: ZHA - Moes Smart Knob for lights (Fixed Dimming)
+  description: 'Control lights with a Moes Smart Knob with proper step dimming.
+    Version 2023-10-25 - Fixed step iteration handling'
   domain: automation
   input:
     remote:
@@ -18,46 +19,42 @@ blueprint:
       selector:
         target:
           entity:
-          - domain:
-            - light
+            domain: light
     step_percent:
-      name: Light step
-      description: Light percent change for each knob step
+      name: Brightness step
+      description: Percent change per knob step (0-100%)
       selector:
         number:
           mode: slider
-          min: 0.0
-          max: 100.0
-          unit_of_measurement: '%'
-          step: 1.0
-      default: 10
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+      default: 20
     press_light:
       name: Pressed light(s)
-      description: The light(s) to control when pressed
+      description: Light(s) to control when pressed
       selector:
         target:
           entity:
-          - domain:
-            - light
+            domain: light
     press_step_percent:
       name: Pressed light step
-      description: Light percent change for each knob step when pressed
+      description: Percent change per knob step when pressed
       selector:
         number:
           mode: slider
-          min: 0.0
-          max: 100.0
-          unit_of_measurement: '%'
-          step: 1.0
-      default: 10
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+      default: 5
     single_press:
-      name: Single press
+      name: Single press action
       description: Action to run on single press
       default: []
       selector:
         action: {}
-  source_url: https://github.com/Dreamscent/HomeIsWhereTheSmartIs/blob/main/Home%20Assistant/Blueprints/ZHA_Tuya_Smart_Knob.yaml
-mode: queued
+  source_url: https://gist.github.com/gonzaloalbito/3dc06702e941e08298ea9bfade731731
+mode: restart
 max_exceeded: silent
 trigger:
 - platform: event
@@ -70,91 +67,86 @@ action:
     cluster_id: '{{ trigger.event.data.cluster_id }}'
     endpoint_id: '{{ trigger.event.data.endpoint_id }}'
     mode: '{% if command != "toggle" %}{{ trigger.event.data.args[0] }}{% endif %}'
-    stepsize: >-
-      {% if command in ["step", "step_color_temp"] %}
-        {{ trigger.event.data.params.step_size|default(0) }}
-      {% else %}
-        0
-      {% endif %}
+    steps: '{% if command != "toggle" %}{{ (trigger.event.data.args[1] / 12.5)|int }}{% endif %}'
     step_percent: !input step_percent
     press_step_percent: !input press_step_percent
 
 - choose:
-  # Toggle button handler
+  # Single press
   - conditions:
     - '{{ cluster_id == 6 }}'
     - '{{ endpoint_id == 1 }}'
     - '{{ command == "toggle" }}'
     sequence: !input single_press
 
-  # Brightness UP handler
+  # Brightness up
   - conditions:
     - '{{ cluster_id == 8 }}'
     - '{{ endpoint_id == 1 }}'
     - '{{ command == "step" }}'
-    - '{{ mode == "StepMode.Up" }}'
+    - '{{ mode == "0" }}'  # StepMode.Up (0 for brightness)
     sequence:
     - repeat:
         while:
         - condition: template
-          value_template: '{{ repeat.index < 2 }}'
+          value_template: '{{ repeat.index <= steps }}'
         sequence:
-        - service_template: light.turn_on
+        - service: light.turn_on
           target: !input light
-          data_template:
-            brightness_step_pct: '{{ step_percent * stepsize }}'
+          data:
+            brightness_step_pct: !input step_percent
             transition: 0.5
 
-  # Brightness DOWN handler
+  # Brightness down
   - conditions:
     - '{{ cluster_id == 8 }}'
     - '{{ endpoint_id == 1 }}'
     - '{{ command == "step" }}'
-    - '{{ mode == "StepMode.Down" }}'
+    - '{{ mode == "1" }}'  # StepMode.Down (1 for brightness)
     sequence:
     - repeat:
         while:
         - condition: template
-          value_template: '{{ repeat.index < 2 }}'
+          value_template: '{{ repeat.index <= steps }}'
         sequence:
-        - service_template: light.turn_on
+        - service: light.turn_on
           target: !input light
-          data_template:
-            brightness_step_pct: '{{ -(step_percent * stepsize) }}'
-            transition: 0.5  # <-- Fixed line
-
-  # Color temperature UP handler
-  - conditions:
-    - '{{ cluster_id == 768 }}'
-    - '{{ endpoint_id == 1 }}'
-    - '{{ command == "step_color_temp" }}'
-    - '{{ mode == "StepMode.Up" }}'
-    sequence:
-    - repeat:
-        while:
-        - condition: template
-          value_template: '{{ repeat.index < 2 }}'
-        sequence:
-        - service_template: light.turn_on
-          target: !input press_light
-          data_template:
-            brightness_step_pct: '{{ press_step_percent * stepsize }}'
+          data:
+            brightness_step_pct: '-{{ step_percent }}'
             transition: 0.5
 
-  # Color temperature DOWN handler
+  # Color temp up (press + rotate)
   - conditions:
     - '{{ cluster_id == 768 }}'
     - '{{ endpoint_id == 1 }}'
     - '{{ command == "step_color_temp" }}'
-    - '{{ mode == "StepMode.Down" }}'
+    - '{{ mode == "1" }}'  # StepMode.Up (1 for color temp)
     sequence:
     - repeat:
         while:
         - condition: template
-          value_template: '{{ repeat.index < 2 }}'
+          value_template: '{{ repeat.index <= steps }}'
         sequence:
-        - service_template: light.turn_on
+        - service: light.turn_on
           target: !input press_light
-          data_template:
-            brightness_step_pct: '{{ -(press_step_percent * stepsize) }}'
+          data:
+            brightness_step_pct: !input press_step_percent
+            transition: 0.5
+
+  # Color temp down (press + rotate)
+  - conditions:
+    - '{{ cluster_id == 768 }}'
+    - '{{ endpoint_id == 1 }}'
+    - '{{ command == "step_color_temp" }}'
+    - '{{ mode == "3" }}'  # StepMode.Down (3 for color temp)
+    sequence:
+    - repeat:
+        while:
+        - condition: template
+          value_template: '{{ repeat.index <= steps }}'
+        sequence:
+        - service: light.turn_on
+          target: !input press_light
+          data:
+            brightness_step_pct: '-{{ press_step_percent }}'
             transition: 0.5
