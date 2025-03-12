@@ -1,22 +1,131 @@
-# Brightness control (Level Control cluster 0x0008)
-- conditions:
-    - '{{ cluster_id == 8 }}'
-    - '{{ command == "step" }}'
-    - '{{ step_mode == 0 }}'  # Up
-  sequence:
-    - service: light.turn_on
-      target: !input light
-      data_template:
-        brightness_step_pct: {{ step_percent }}
-        transition: {{ transition_time | int }}
+blueprint:
+  name: ZHA - Moes Smart Knob (Final Working Version)
+  description: 'Final version with proper numeric handling and preserved toggle'
+  domain: automation
+  input:
+    remote:
+      name: Remote
+      selector:
+        device:
+          integration: zha
+          manufacturer: _TZ3000_qja6nq5z
+          model: TS004F
+    light:
+      name: Light(s)
+      selector:
+        target:
+          entity:
+            domain: light
+    step_percent:
+      name: Brightness step (%)
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+      default: 20
+    press_light:
+      name: Pressed light(s)
+      selector:
+        target:
+          entity:
+            domain: light
+    press_step_percent:
+      name: Pressed step (%)
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+      default: 5
+    single_press:
+      name: Single press action
+      selector:
+        action: {}
+      default: []
+  source_url: https://github.com/Dreamscent/HomeIsWhereTheSmartIs/blob/main/Home%20Assistant/Blueprints/ZHA_Tuya_Smart_Knob%20-%20Command.yaml
+trigger:
+  - platform: event
+    event_type: zha_event
+    event_data:
+      device_id: !input remote
+mode: restart
+max_exceeded: silent
 
-- conditions:
-    - '{{ cluster_id == 8 }}'
-    - '{{ command == "step" }}'
-    - '{{ step_mode == 1 }}'  # Down
-  sequence:
-    - service: light.turn_on
-      target: !input light
-      data_template:
-        brightness_step_pct: {{ -step_percent }}
-        transition: {{ transition_time | int }}
+action:
+  - variables:
+      command: '{{ trigger.event.data.command }}'
+      cluster_id: '{{ trigger.event.data.cluster_id | int }}'
+      endpoint_id: '{{ trigger.event.data.endpoint_id | int }}'
+      step_mode: >-
+        {% if command in ['step', 'step_color_temp'] %}
+          {{ trigger.event.data.args[0] | int }}
+        {% else %}
+          -1
+        {% endif %}
+      steps: >-
+        {% if command in ['step', 'step_color_temp'] %}
+          {{ (trigger.event.data.args[1] | int / 12.5) | int }}
+        {% else %}
+          0
+        {% endif %}
+      transition_time: >-
+        {% if command in ['step', 'step_color_temp'] %}
+          {{ trigger.event.data.args[2] | int }}
+        {% else %}
+          0
+        {% endif %}
+
+  - choose:
+      # Single press (toggle) - PRESERVED WORKING CODE
+      - conditions:
+          - '{{ cluster_id == 6 }}'  # OnOff cluster
+          - '{{ endpoint_id == 1 }}'
+          - '{{ command == "toggle" }}'
+        sequence: !input single_press
+
+      # Brightness control (Level Control cluster 0x0008)
+      - conditions:
+          - '{{ cluster_id == 8 }}'
+          - '{{ command == "step" }}'
+          - '{{ step_mode == 0 }}'  # Up
+        sequence:
+          - service_template: light.turn_on
+            target: !input light
+            data_template:
+              brightness_step_pct: {{ step_percent * steps }}
+              transition: {{ transition_time | float }}
+
+      - conditions:
+          - '{{ cluster_id == 8 }}'
+          - '{{ command == "step" }}'
+          - '{{ step_mode == 1 }}'  # Down
+        sequence:
+          - service_template: light.turn_on
+            target: !input light
+            data_template:
+              brightness_step_pct: {{ -step_percent * steps }}
+              transition: {{ transition_time | float }}
+
+      # Press-and-rotate (Color Control cluster 0x0300)
+      - conditions:
+          - '{{ cluster_id == 768 }}'
+          - '{{ command == "step_color_temp" }}'
+          - '{{ step_mode == 1 }}'  # Up
+        sequence:
+          - service_template: light.turn_on
+            target: !input press_light
+            data_template:
+              brightness_step_pct: {{ press_step_percent * steps }}
+              transition: {{ transition_time | float }}
+
+      - conditions:
+          - '{{ cluster_id == 768 }}'
+          - '{{ command == "step_color_temp" }}'
+          - '{{ step_mode == 3 }}'  # Down
+        sequence:
+          - service_template: light.turn_on
+            target: !input press_light
+            data_template:
+              brightness_step_pct: {{ -press_step_percent * steps }}
+              transition: {{ transition_time | float }}
