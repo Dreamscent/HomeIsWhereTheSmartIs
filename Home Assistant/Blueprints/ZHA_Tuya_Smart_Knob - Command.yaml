@@ -1,5 +1,5 @@
 blueprint:
-  name: ZHA - Moes Smart Knob for lights
+  name: ZHA - Moes Smart Knob for lights - Command Mode
   description: 'Control lights with a Moes Smart Knob.
   
     The knob functions in 2 modes: Command and Event/Scene. To switch between them, triple click the center button
