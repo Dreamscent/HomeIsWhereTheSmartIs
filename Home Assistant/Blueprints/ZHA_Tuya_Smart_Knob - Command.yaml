@@ -93,8 +93,8 @@ action:
           - service: light.turn_on
             target: !input light
             data_template:
-              brightness_step_pct: '{{ step_percent }}'
-              transition: '{{ transition_time | int }}'
+              brightness_step_pct: {{ step_percent }}
+              transition: {{ transition_time | int }}
 
       - conditions:
           - '{{ cluster_id == 8 }}'
@@ -104,8 +104,8 @@ action:
           - service: light.turn_on
             target: !input light
             data_template:
-              brightness_step_pct: '{{ -step_percent }}'
-              transition: '{{ transition_time | int }}'
+              brightness_step_pct: {{ -step_percent }}
+              transition: {{ transition_time | int }}
 
       # Press-and-rotate (Color Control cluster 0x0300)
       - conditions:
@@ -116,8 +116,8 @@ action:
           - service: light.turn_on
             target: !input press_light
             data_template:
-              brightness_step_pct: '{{ press_step_percent }}'
-              transition: '{{ transition_time | int }}'
+              brightness_step_pct: {{ press_step_percent }}
+              transition: {{ transition_time | int }}
 
       - conditions:
           - '{{ cluster_id == 768 }}'
@@ -127,5 +127,5 @@ action:
           - service: light.turn_on
             target: !input press_light
             data_template:
-              brightness_step_pct: '{{ -press_step_percent }}'
-              transition: '{{ transition_time | int }}'
+              brightness_step_pct: {{ -press_step_percent }}
+              transition: {{ transition_time | int }}
