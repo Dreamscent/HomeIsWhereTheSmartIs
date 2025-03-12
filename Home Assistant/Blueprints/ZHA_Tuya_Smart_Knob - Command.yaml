@@ -1,68 +1,58 @@
 blueprint:
-  name: ZHA - Moes Smart Knob for Lights (Rewritten)
-  description: >
-    Control lights with a Moes Smart Knob.
-    - Single Press: Toggle the light
-    - Rotate Right: Increase brightness
-    - Rotate Left: Decrease brightness
+  name: ZHA - Moes Smart Knob for lights
+  description: 'Updated automation for Moes Smart Knob supporting single press and step dimming.'
   domain: automation
   input:
     remote:
       name: Remote
-      description: Moes Knob to use
       selector:
         device:
           integration: zha
-          multiple: false
     light:
       name: Light(s)
-      description: The light(s) to control
       selector:
         target:
           entity:
           - domain:
             - light
     step_percent:
-      name: Light step percentage
-      description: Brightness step change per knob rotation
+      name: Light step
       selector:
         number:
           mode: slider
           min: 1.0
-          max: 50.0
+          max: 100.0
           step: 1.0
-          unit_of_measurement: '%'
       default: 10
 
 trigger:
-  - platform: event
-    event_type: zha_event
-    event_data:
-      device_id: !input remote
+- platform: event
+  event_type: zha_event
+  event_data:
+    device_id: !input remote
 
 action:
-  - variables:
-      command: '{{ trigger.event.data.command }}'
-      cluster_id: '{{ trigger.event.data.cluster_id }}'
-      step_mode: '{{ trigger.event.data.params.step_mode | default(-1) }}'
-      step_size: '{{ trigger.event.data.params.step_size | default(0) }}'
-      step_percent: !input step_percent
+- variables:
+    command: '{{ trigger.event.data.command }}'
+    cluster_id: '{{ trigger.event.data.cluster_id }}'
+    step_mode: '{{ trigger.event.data.params.step_mode | int }}'
+    step_size: '{{ trigger.event.data.params.step_size | float }}'
+    step_percent: '{{ step_size / 255 * 100 }}'
 
-  - choose:
-      - conditions:
-          - '{{ cluster_id == 6 }}'
-          - '{{ command == "toggle" }}'
-        sequence:
-          - service: light.toggle
-            target: !input light
-
-      - conditions:
-          - '{{ cluster_id == 8 }}'
-          - '{{ command == "step" }}'
-        sequence:
-          - service: light.turn_on
-            target: !input light
-            data:
-              brightness_step_pct: >
-                {% if step_mode == 0 %} {{ step_percent }} {% elif step_mode == 1 %} -{{ step_percent }} {% endif %}
-              transition: 0.5
+- choose:
+  - conditions:
+    - '{{ cluster_id == 6 }}'
+    - '{{ command == "toggle" }}'
+    sequence:
+      - service: light.toggle
+        target: !input light
+  
+  - conditions:
+    - '{{ cluster_id == 8 }}'
+    - '{{ command == "step" }}'
+    sequence:
+      - service: light.turn_on
+        target: !input light
+        data:
+          brightness_step_pct: '{{ step_percent if step_mode == 0 else -step_percent }}'
+          transition: 0.5
