@@ -1,6 +1,6 @@
 blueprint:
   name: ZHA - Moes Smart Knob (Final Working Version)
-  description: 'Final version with proper numeric handling and preserved toggle'
+  description: 'Final version with hardcoded transition and proper numeric handling'
   domain: automation
   input:
     remote:
@@ -69,12 +69,7 @@ action:
         {% else %}
           0
         {% endif %}
-      transition_time: >-
-        {% if command in ['step', 'step_color_temp'] %}
-          {{ trigger.event.data.args[2] | int }}
-        {% else %}
-          0
-        {% endif %}
+      transition_time: 0.5  # Hardcoded transition value
 
   - choose:
       # Single press (toggle) - PRESERVED WORKING CODE
@@ -90,22 +85,22 @@ action:
           - '{{ command == "step" }}'
           - '{{ step_mode == 0 }}'  # Up
         sequence:
-          - service_template: light.turn_on
+          - service: light.turn_on
             target: !input light
-            data_template:
-              brightness_step_pct: {{ step_percent * steps }}
-              transition: {{ transition_time | float }}
+            data:
+              brightness_step_pct: !input step_percent
+              transition: 0.5
 
       - conditions:
           - '{{ cluster_id == 8 }}'
           - '{{ command == "step" }}'
           - '{{ step_mode == 1 }}'  # Down
         sequence:
-          - service_template: light.turn_on
+          - service: light.turn_on
             target: !input light
-            data_template:
-              brightness_step_pct: {{ -step_percent * steps }}
-              transition: {{ transition_time | float }}
+            data:
+              brightness_step_pct: !input '-{{ step_percent }}'
+              transition: 0.5
 
       # Press-and-rotate (Color Control cluster 0x0300)
       - conditions:
@@ -113,19 +108,19 @@ action:
           - '{{ command == "step_color_temp" }}'
           - '{{ step_mode == 1 }}'  # Up
         sequence:
-          - service_template: light.turn_on
+          - service: light.turn_on
             target: !input press_light
-            data_template:
-              brightness_step_pct: {{ press_step_percent * steps }}
-              transition: {{ transition_time | float }}
+            data:
+              brightness_step_pct: !input press_step_percent
+              transition: 0.5
 
       - conditions:
           - '{{ cluster_id == 768 }}'
           - '{{ command == "step_color_temp" }}'
           - '{{ step_mode == 3 }}'  # Down
         sequence:
-          - service_template: light.turn_on
+          - service: light.turn_on
             target: !input press_light
-            data_template:
-              brightness_step_pct: {{ -press_step_percent * steps }}
-              transition: {{ transition_time | float }}
+            data:
+              brightness_step_pct: !input '-{{ press_step_percent }}'
+              transition: 0.5
