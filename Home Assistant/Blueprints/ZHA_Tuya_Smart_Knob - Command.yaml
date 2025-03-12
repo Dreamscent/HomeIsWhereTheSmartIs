@@ -1,6 +1,6 @@
 blueprint:
-  name: ZHA - Moes Smart Knob (Fixed Dimming)
-  description: 'Corrected version with proper step_mode handling and debugged variables'
+  name: ZHA - Moes Smart Knob (2025)
+  description: 'Corrected version with error handling and working toggle'
   domain: automation
   input:
     remote:
@@ -58,18 +58,26 @@ action:
       cluster_id: '{{ trigger.event.data.cluster_id | int }}'
       endpoint_id: '{{ trigger.event.data.endpoint_id | int }}'
       step_mode: >-
-        {% if command == 'step' or command == 'step_color_temp' %}
+        {% if command in ['step', 'step_color_temp'] %}
           {{ trigger.event.data.args[0] | int }}
+        {% else %}
+          -1
         {% endif %}
       steps: >-
-        {% if command == 'step' or command == 'step_color_temp' %}
-          {{ (trigger.event.data.args[1] / 12.5) | int }}
+        {% if command in ['step', 'step_color_temp'] %}
+          {{ (trigger.event.data.args[1] | int / 12.5) | int }}
+        {% else %}
+          0
         {% endif %}
-      step_size: '{{ trigger.event.data.args[1] | int }}'
-      transition_time: '{{ trigger.event.data.args[2] | int }}'
+      transition_time: >-
+        {% if command in ['step', 'step_color_temp'] %}
+          {{ trigger.event.data.args[2] | int }}
+        {% else %}
+          0
+        {% endif %}
 
   - choose:
-      # Single press (toggle command)
+      # Single press (toggle) - PRESERVED WORKING CODE
       - conditions:
           - '{{ cluster_id == 6 }}'  # OnOff cluster
           - '{{ endpoint_id == 1 }}'
