@@ -3,7 +3,59 @@ blueprint:
   description: 'Control lights with a Moes Smart Knob. [...]'
   domain: automation
   input:
-    # ... (keep your existing input definitions)
+    remote:
+      name: Remote
+      description: Moes Knob to use
+      selector:
+        device:
+          integration: zha
+          manufacturer: _TZ3000_qja6nq5z
+          model: TS004F
+          multiple: false
+    light:
+      name: Light(s)
+      description: The light(s) to control
+      selector:
+        target:
+          entity:
+          - domain:
+            - light
+    step_percent:
+      name: Light step
+      description: Light percent change for each knob step
+      selector:
+        number:
+          mode: slider
+          min: 0.0
+          max: 100.0
+          unit_of_measurement: '%'
+          step: 1.0
+      default: 10
+    press_light:
+      name: Pressed light(s)
+      description: The light(s) to control when pressed
+      selector:
+        target:
+          entity:
+          - domain:
+            - light
+    press_step_percent:
+      name: Pressed light step
+      description: Light percent change for each knob step when pressed
+      selector:
+        number:
+          mode: slider
+          min: 0.0
+          max: 100.0
+          unit_of_measurement: '%'
+          step: 1.0
+      default: 10
+    single_press:
+      name: Single press
+      description: Action to run on single press
+      default: []
+      selector:
+        action: {}
   source_url: https://github.com/Dreamscent/HomeIsWhereTheSmartIs/blob/main/Home%20Assistant/Blueprints/ZHA_Tuya_Smart_Knob.yaml
 mode: queued
 max_exceeded: silent
@@ -26,7 +78,6 @@ action:
       {% endif %}
     step_percent: !input step_percent
     press_step_percent: !input press_step_percent
-    # ... (keep other variables if needed)
 
 - choose:
   # Toggle button handler
@@ -70,115 +121,7 @@ action:
           target: !input light
           data_template:
             brightness_step_pct: '{{ -(step_percent * stepsize) }}'
-            transition: 0.5
-
-  # Color temperature UP handler
-  - conditions:
-    - '{{ cluster_id == 768 }}'
-    - '{{ endpoint_id == 1 }}'
-    - '{{ command == "step_color_temp" }}'
-    - '{{ mode == "StepMode.Up" }}'
-    sequence:
-    - repeat:
-        while:
-        - condition: template
-          value_template: '{{ repeat.index < 2 }}'
-        sequence:
-        - service_template: light.turn_on
-          target: !input press_light
-          data_template:
-            brightness_step_pct: '{{ press_step_percent * stepsize }}'
-            transition: 0.5
-
-  # Color temperature DOWN handler
-  - conditions:
-    - '{{ cluster_id == 768 }}'
-    - '{{ endpoint_id == 1 }}'
-    - '{{ command == "step_color_temp" }}'
-    - '{{ mode == "StepMode.Down" }}'
-    sequence:
-    - repeat:
-        while:
-        - condition: template
-          value_template: '{{ repeat.index < 2 }}'
-        sequence:
-        - service_template: light.turn_on
-          target: !input press_light
-          data_template:
-            brightness_step_pct: '{{ -(press_step_percent * stepsize) }}'
-            transition: 0.5blueprint:
-  name: ZHA - Moes Smart Knob for lights
-  description: 'Control lights with a Moes Smart Knob. [...]'
-  domain: automation
-  input:
-    # ... (keep your existing input definitions)
-  source_url: https://github.com/Dreamscent/HomeIsWhereTheSmartIs/blob/main/Home%20Assistant/Blueprints/ZHA_Tuya_Smart_Knob.yaml
-mode: queued
-max_exceeded: silent
-trigger:
-- platform: event
-  event_type: zha_event
-  event_data:
-    device_id: !input remote
-action:
-- variables:
-    command: '{{ trigger.event.data.command }}'
-    cluster_id: '{{ trigger.event.data.cluster_id }}'
-    endpoint_id: '{{ trigger.event.data.endpoint_id }}'
-    mode: '{% if command != "toggle" %}{{ trigger.event.data.args[0] }}{% endif %}'
-    stepsize: >-
-      {% if command in ["step", "step_color_temp"] %}
-        {{ trigger.event.data.params.step_size|default(0) }}
-      {% else %}
-        0
-      {% endif %}
-    step_percent: !input step_percent
-    press_step_percent: !input press_step_percent
-    # ... (keep other variables if needed)
-
-- choose:
-  # Toggle button handler
-  - conditions:
-    - '{{ cluster_id == 6 }}'
-    - '{{ endpoint_id == 1 }}'
-    - '{{ command == "toggle" }}'
-    sequence: !input single_press
-
-  # Brightness UP handler
-  - conditions:
-    - '{{ cluster_id == 8 }}'
-    - '{{ endpoint_id == 1 }}'
-    - '{{ command == "step" }}'
-    - '{{ mode == "StepMode.Up" }}'
-    sequence:
-    - repeat:
-        while:
-        - condition: template
-          value_template: '{{ repeat.index < 2 }}'
-        sequence:
-        - service_template: light.turn_on
-          target: !input light
-          data_template:
-            brightness_step_pct: '{{ step_percent * stepsize }}'
-            transition: 0.5
-
-  # Brightness DOWN handler
-  - conditions:
-    - '{{ cluster_id == 8 }}'
-    - '{{ endpoint_id == 1 }}'
-    - '{{ command == "step" }}'
-    - '{{ mode == "StepMode.Down" }}'
-    sequence:
-    - repeat:
-        while:
-        - condition: template
-          value_template: '{{ repeat.index < 2 }}'
-        sequence:
-        - service_template: light.turn_on
-          target: !input light
-          data_template:
-            brightness_step_pct: '{{ -(step_percent * stepsize) }}'
-            transition: 0.5
+            transition: 0.5  # <-- Fixed line
 
   # Color temperature UP handler
   - conditions:
