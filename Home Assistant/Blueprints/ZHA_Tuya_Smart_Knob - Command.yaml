@@ -1,6 +1,6 @@
 blueprint:
-  name: ZHA - Moes Smart Knob (Final Working Version)
-  description: 'Final version with hardcoded transition and proper numeric handling'
+  name: ZHA - Moes Smart Knob (Working Version)
+  description: 'Final version with proper negative value handling'
   domain: automation
   input:
     remote:
@@ -69,58 +69,59 @@ action:
         {% else %}
           0
         {% endif %}
-      transition_time: 0.5  # Hardcoded transition value
 
   - choose:
-      # Single press (toggle) - PRESERVED WORKING CODE
+      # Single press (toggle)
       - conditions:
-          - '{{ cluster_id == 6 }}'  # OnOff cluster
+          - '{{ cluster_id == 6 }}'
           - '{{ endpoint_id == 1 }}'
           - '{{ command == "toggle" }}'
         sequence: !input single_press
 
-      # Brightness control (Level Control cluster 0x0008)
+      # Brightness control (Up)
       - conditions:
           - '{{ cluster_id == 8 }}'
           - '{{ command == "step" }}'
-          - '{{ step_mode == 0 }}'  # Up
+          - '{{ step_mode == 0 }}'
         sequence:
           - service: light.turn_on
             target: !input light
-            data:
-              brightness_step_pct: !input step_percent
+            data_template:
+              brightness_step_pct: {{ step_percent }}
               transition: 0.5
 
+      # Brightness control (Down)
       - conditions:
           - '{{ cluster_id == 8 }}'
           - '{{ command == "step" }}'
-          - '{{ step_mode == 1 }}'  # Down
+          - '{{ step_mode == 1 }}'
         sequence:
           - service: light.turn_on
             target: !input light
-            data:
-              brightness_step_pct: !input '-{{ step_percent }}'
+            data_template:
+              brightness_step_pct: {{ -step_percent }}
               transition: 0.5
 
-      # Press-and-rotate (Color Control cluster 0x0300)
+      # Press-and-rotate (Color Temp Up)
       - conditions:
           - '{{ cluster_id == 768 }}'
           - '{{ command == "step_color_temp" }}'
-          - '{{ step_mode == 1 }}'  # Up
+          - '{{ step_mode == 1 }}'
         sequence:
           - service: light.turn_on
             target: !input press_light
-            data:
-              brightness_step_pct: !input press_step_percent
+            data_template:
+              brightness_step_pct: {{ press_step_percent }}
               transition: 0.5
 
+      # Press-and-rotate (Color Temp Down)
       - conditions:
           - '{{ cluster_id == 768 }}'
           - '{{ command == "step_color_temp" }}'
-          - '{{ step_mode == 3 }}'  # Down
+          - '{{ step_mode == 3 }}'
         sequence:
           - service: light.turn_on
             target: !input press_light
-            data:
-              brightness_step_pct: !input '-{{ press_step_percent }}'
+            data_template:
+              brightness_step_pct: {{ -press_step_percent }}
               transition: 0.5
