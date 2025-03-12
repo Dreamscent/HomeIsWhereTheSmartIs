@@ -64,7 +64,7 @@ blueprint:
       default: []
       selector:
         action: {}
-  source_url: https://gist.github.com/gonzaloalbito/3dc06702e941e08298ea9bfade731731
+  source_url: https://github.com/Dreamscent/HomeIsWhereTheSmartIs/blob/main/Home%20Assistant/Blueprints/ZHA_Tuya_Smart_Knob%20-%20Command.yaml
 mode: restart
 max_exceeded: silent
 trigger:
@@ -100,60 +100,64 @@ action:
           - '{{ command == ''step'' }}'
           - '{{ mode == 0 }}'  # StepMode.Up (0)
         sequence:
-          - service: system_log.write  # Debug step
-            data:
-              message: "Brightness Step PCT: {{ step_percent * steps }}"
-              level: info
-          - service: light.turn_on
-            target: !input light
-            data:
-              brightness_step_pct: '{{ step_percent * steps }}'
-              transition: 0.5
+          - repeat:
+              while:
+                - condition: template
+                  value_template: '{{ repeat.index < 2 }}'
+              sequence:
+                - service: light.turn_on
+                  target: !input light
+                  data:
+                    brightness_step_pct: '{{ step_percent * steps }}'
+                    transition: 0.5
       - conditions:
           - '{{ cluster_id == 8 }}'
           - '{{ endpoint_id == 1 }}'
           - '{{ command == ''step'' }}'
           - '{{ mode == 1 }}'  # StepMode.Down (1)
         sequence:
-          - service: system_log.write  # Debug step
-            data:
-              message: "Brightness Step PCT: -{{ step_percent * steps }}"
-              level: info
-          - service: light.turn_on
-            target: !input light
-            data:
-              brightness_step_pct: '-{{ step_percent * steps }}'
-              transition: 0.5
+          - repeat:
+              while:
+                - condition: template
+                  value_template: '{{ repeat.index < 2 }}'
+              sequence:
+                - service: light.turn_on
+                  target: !input light
+                  data:
+                    brightness_step_pct: '-{{ step_percent * steps }}'
+                    transition: 0.5
       - conditions:
           - '{{ cluster_id == 768 }}'
           - '{{ endpoint_id == 1 }}'
           - '{{ command == ''step_color_temp'' }}'
           - '{{ mode == 0 }}'  # StepMode.Up (0)
         sequence:
-          - service: system_log.write  # Debug step
-            data:
-              message: "Pressed Brightness Step PCT: {{ press_step_percent * steps }}"
-              level: info
-          - service: light.turn_on
-            target: !input press_light
-            data:
-              brightness_step_pct: '{{ press_step_percent * steps }}'
-              transition: 0.5
+          - repeat:
+              while:
+                - condition: template
+                  value_template: '{{ repeat.index < 2 }}'
+              sequence:
+                - service: light.turn_on
+                  target: !input press_light
+                  data:
+                    brightness_step_pct: '{{ press_step_percent * steps }}'
+                    transition: 0.5
       - conditions:
           - '{{ cluster_id == 768 }}'
           - '{{ endpoint_id == 1 }}'
           - '{{ command == ''step_color_temp'' }}'
           - '{{ mode == 1 }}'  # StepMode.Down (1)
         sequence:
-          - service: system_log.write  # Debug step
-            data:
-              message: "Pressed Brightness Step PCT: -{{ press_step_percent * steps }}"
-              level: info
-          - service: light.turn_on
-            target: !input press_light
-            data:
-              brightness_step_pct: '-{{ press_step_percent * steps }}'
-              transition: 0.5
+          - repeat:
+              while:
+                - condition: template
+                  value_template: '{{ repeat.index < 2 }}'
+              sequence:
+                - service: light.turn_on
+                  target: !input press_light
+                  data:
+                    brightness_step_pct: '-{{ press_step_percent * steps }}'
+                    transition: 0.5
       - default:
           - service: system_log.write  # Debug step
             data:
