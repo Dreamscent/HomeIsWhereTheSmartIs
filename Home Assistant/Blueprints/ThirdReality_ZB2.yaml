@@ -5,11 +5,10 @@ blueprint:
 
   input:
     remote:
-      name: Remote action sensor
-      description: sensor.<device>_action from Zigbee2MQTT
+      name: Remote
       selector:
-        entity:
-          domain: sensor
+        device:
+          integration: mqtt
 
     button_1_single:
       name: Button 1 - Single
